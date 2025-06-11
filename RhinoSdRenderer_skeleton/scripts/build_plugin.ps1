@@ -14,7 +14,10 @@ if (!(Test-Path $dist)) { New-Item $dist -ItemType Directory | Out-Null }
 Get-ChildItem plugin/bin/$Configuration/net7.0-windows/*.rhp | Copy-Item -Destination $dist -Force
 Get-ChildItem plugin/bin/$Configuration/net7.0-windows/*.dll | Copy-Item -Destination $dist -Force
 
-Write-Host "📦 Packing .rhi … (placeholder – implement Rhino RHI packaging here)"
-# TODO: call Rhino Installer Engine CLI or zip as .rhi
+Write-Host "📦 Packing .rhi …"
+$rhi = Join-Path $dist 'RhinoSdRenderer.rhi'
+if (Test-Path $rhi) { Remove-Item $rhi }
+Compress-Archive -Path (Join-Path $dist '*') -DestinationPath $rhi
+
 
 Write-Host "✅ Done.  Output in dist/"

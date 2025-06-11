@@ -22,7 +22,8 @@ namespace RhinoSdRenderer
             try
             {
                 // Initialise pythonnet runtime & append python path
-                Runtime.PythonDLL = "python310.dll";         // TODO: make configurable
+                string pyDll = Environment.GetEnvironmentVariable("PYTHON_DLL") ?? "python310.dll";
+                Runtime.PythonDLL = pyDll;
                 PythonEngine.Initialize();
                 using (Py.GIL())
                 {
@@ -67,7 +68,9 @@ namespace RhinoSdRenderer
             {
                 dynamic bridge = Py.Import("main");  // python/main.py
                 var pyBytes    = new PyBytes(pngBytes);
-                dynamic pyImg  = bridge.render_image(pyBytes, "brutalist atrium"); // placeholder prompt
+                string prompt  = Environment.GetEnvironmentVariable("SD_PROMPT")
+                                 ?? "A photorealistic render";
+                dynamic pyImg  = bridge.render_image(pyBytes, prompt);
                 resultBmp      = (Bitmap)pyImg.AsManagedObject(typeof(Bitmap));
             }
 
