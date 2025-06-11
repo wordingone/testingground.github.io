@@ -1,0 +1,16 @@
+# Build artifacts
+*/bin/
+*/obj/
+*.rhp
+*.rhi
+# Python
+venv/
+__pycache__/
+*.pyc
+# Models (large)
+models/
+# IDE
+.vscode/
+*.user
+*.suo
+*.userprefs
