@@ -10,7 +10,7 @@ We return:
 import io, os, torch, numpy as np
 from PIL import Image
 from diffusers import StableDiffusionControlNetPipeline, ControlNetModel
-from controlnet_aux import OpenposeDetector, CannyDetector
+from controlnet_aux import CannyDetector
 
 # --- lazy global initialisation ---
 pipe = None
@@ -18,7 +18,7 @@ def _init():
     global pipe, canny
     if pipe is not None:
         return
-    model_path   = os.getenv("SDXL_PATH",   "../models/sd35_medium")   # TODO: CLI/env override
+    model_path   = os.getenv("SDXL_PATH",   "../models/sd35_medium")
     control_path = os.getenv("CANNY_PATH",  "../models/canny_cn")
     controlnet   = ControlNetModel.from_pretrained(control_path, torch_dtype=torch.float16)
     pipe         = StableDiffusionControlNetPipeline.from_pretrained(
@@ -49,3 +49,16 @@ def render_image(png_bytes: bytes, prompt: str):
     ms = SD.Imaging.MemoryStream()
     out.save(ms, format="PNG")
     return SD.Bitmap(ms)
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Render an image using the SD pipeline")
+    parser.add_argument("input", help="Input PNG file")
+    parser.add_argument("--prompt", required=True, help="Text prompt")
+    parser.add_argument("-o", "--output", default="out.png", help="Output file")
+    args = parser.parse_args()
+
+    with open(args.input, "rb") as f:
+        bmp = render_image(f.read(), args.prompt)
+    bmp.Save(args.output)
