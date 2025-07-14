@@ -1,0 +1,9 @@
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+/* simple helper to center content */
+.Cover, .FullVideo, .InitialMoodboardFrame, .End {
+  display: flex;
+}
