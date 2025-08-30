@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+  />
+  <title>Advanced Hand Tracker</title>
+
+  <!-- MediaPipe (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+  <style>
+    :root{
+      --hud-bg: rgba(14,16,22,.35);
+      --hud-blur: saturate(120%) blur(10px);
+      --accent: #7df9ff;
+      --ok: #35d07f;
+      --warn: #ff6b6b;
+      --wrist: #ff0080;
+      --thumb: #ff6b6b;
+      --index: #4ecdc4;
+      --middle: #45b7d1;
+      --ring: #96ceb4;
+      --pinky: #ffeaa7;
+    }
+    html, body { height: 100%; background: #000; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, Roboto, Arial, sans-serif; color: #e7f6ff; }
+
+    /* Full-viewport stage */
+    .stage {
+      position: fixed; inset: 0;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    /* Camera and overlay fill the viewport; mirrored selfie */
+    video#inputVideo, canvas#outputCanvas {
+      position: absolute; inset: 0;
+      width: 100vw; height: 100vh;
+      object-fit: cover;
+      transform: scaleX(-1);
+      -webkit-user-select: none; user-select: none; pointer-events: none;
+    }
+    canvas#outputCanvas { pointer-events: none; }
+
+    /* Minimal HUD */
+    .hud {
+      position: fixed; left: 16px; right: 16px; top: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: 14px;
+      background: var(--hud-bg); backdrop-filter: var(--hud-blur);
+      border: 1px solid rgba(125,249,255,.25);
+    }
+    .hud .title { display:flex; gap:10px; align-items:center; font-weight:600; letter-spacing:.3px; }
+    .status-dot { width:10px; height:10px; border-radius:50%; background:#888; box-shadow:0 0 10px currentColor; }
+    .status-dot.live { background: var(--ok); animation: pulse 2s infinite; }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .hand-panel {
+      position: fixed; left: 16px; right: 16px; bottom: 18px;
+      display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+      background: var(--hud-bg); backdrop-filter: var(--hud-blur);
+      border: 1px solid rgba(125,249,255,.2); border-radius: 14px; padding: 12px;
+      max-height: 30vh; overflow-y: auto;
+    }
+    
+    .hands-grid {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    
+    .hand-info {
+      padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.12); font-size: 13px;
+      display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
+    }
+    
+    .settings-btn {
+      appearance: none; background: rgba(125,249,255,.15);
+      border: 1px solid rgba(125,249,255,.3);
+      color: var(--accent); padding: 8px 12px; border-radius: 8px;
+      font-size: 12px; cursor: pointer; transition: all 0.2s;
+    }
+    .settings-btn:hover { background: rgba(125,249,255,.25); }
+
+    .settings-panel {
+      position: fixed; right: 16px; top: 80px; width: 280px;
+      background: var(--hud-bg); backdrop-filter: var(--hud-blur);
+      border: 1px solid rgba(125,249,255,.2); border-radius: 14px; 
+      padding: 16px; opacity: 0; pointer-events: none;
+      transition: all 0.3s ease;
+    }
+    .settings-panel.show { opacity: 1; pointer-events: all; }
+    
+    .setting-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; font-size: 13px;
+    }
+    
+    .setting-row input[type="range"] {
+      width: 100px; accent-color: var(--accent);
+    }
+    
+    .landmark-legend {
+      position: fixed; left: 16px; top: 80px;
+      background: var(--hud-bg); backdrop-filter: var(--hud-blur);
+      border: 1px solid rgba(125,249,255,.2); border-radius: 12px;
+      padding: 12px; font-size: 11px; opacity: 0; pointer-events: none;
+      transition: all 0.3s ease; max-width: 200px;
+    }
+    .landmark-legend.show { opacity: 1; pointer-events: all; }
+    .legend-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* Center start button */
+    .start-wrap {
+      position: fixed; inset: 0; display: grid; place-items: center;
+      background: radial-gradient(800px 400px at 50% 60%, rgba(125,249,255,.08), transparent 70%);
+    }
+    button#startBtn {
+      appearance: none; border: 1px solid rgba(125,249,255,.45);
+      background: linear-gradient(180deg, rgba(125,249,255,.25), rgba(125,249,255,.12));
+      color: #e7f6ff; font-weight: 600; font-size: 16px; letter-spacing:.3px;
+      padding: 14px 20px; border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(125,249,255,.15), inset 0 1px 0 rgba(255,255,255,.15);
+      cursor: pointer; transition: transform .08s ease, filter .15s ease, opacity .2s;
+    }
+    button#startBtn:active { transform: translateY(1px) scale(.99); }
+    .hidden { opacity: 0; pointer-events: none; }
+
+    /* Performance indicator */
+    .perf-indicator {
+      position: fixed; top: 16px; right: 16px;
+      background: var(--hud-bg); backdrop-filter: var(--hud-blur);
+      border: 1px solid rgba(125,249,255,.2); border-radius: 8px;
+      padding: 6px 10px; font-size: 11px; z-index: 1000;
+    }
+
+    /* Small screens */
+    @media (max-width:480px){
+      .hud, .hand-panel { left:12px; right:12px; }
+      button#startBtn{ font-size:15px; padding:12px 18px; }
+      .settings-panel { width: calc(100vw - 24px); right: 12px; }
+      .landmark-legend { left: 12px; max-width: calc(100vw - 24px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <video id="inputVideo" playsinline muted></video>
+    <canvas id="outputCanvas"></canvas>
+  </div>
+
+  <div class="hud" id="hud">
+    <div class="title">
+      <div class="status-dot" id="dot"></div>
+      <div>Advanced Hand Tracker</div>
+    </div>
+    <div id="fps" class="perf-indicator">FPS: —</div>
+  </div>
+
+  <div class="hand-panel" id="handInfo">
+    <div class="hands-grid">
+      <div class="hand-info">Awaiting camera permission...</div>
+    </div>
+    <button class="settings-btn" id="settingsBtn">⚙️</button>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <h4 style="margin: 0 0 12px 0; color: var(--accent);">Settings</h4>
+    <div class="setting-row">
+      <label>Detection Confidence</label>
+      <input type="range" id="detectionConf" min="0.1" max="1" step="0.1" value="0.7">
+    </div>
+    <div class="setting-row">
+      <label>Tracking Confidence</label>
+      <input type="range" id="trackingConf" min="0.1" max="1" step="0.1" value="0.5">
+    </div>
+    <div class="setting-row">
+      <label>Max Hands</label>
+      <input type="range" id="maxHands" min="1" max="4" step="1" value="2">
+    </div>
+    <div class="setting-row">
+      <label>Landmark Size</label>
+      <input type="range" id="landmarkSize" min="2" max="10" step="1" value="4">
+    </div>
+    <div class="setting-row">
+      <label>Show Connections</label>
+      <input type="checkbox" id="showConnections" checked>
+    </div>
+    <div class="setting-row">
+      <label>Show Legend</label>
+      <input type="checkbox" id="showLegend">
+    </div>
+    <button class="settings-btn" onclick="document.getElementById('settingsPanel').classList.toggle('show')" style="width: 100%; margin-top: 8px;">Close</button>
+  </div>
+
+  <div class="landmark-legend" id="legend">
+    <h4 style="margin: 0 0 8px 0; color: var(--accent); font-size: 12px;">Hand Landmarks</h4>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--wrist);"></div>Wrist</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--thumb);"></div>Thumb</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--index);"></div>Index</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--middle);"></div>Middle</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--ring);"></div>Ring</div>
+    <div class="legend-item"><div class="legend-dot" style="background: var(--pinky);"></div>Pinky</div>
+  </div>
+
+  <div class="start-wrap" id="startWrap">
+    <button id="startBtn">🖐️ Start Hand Tracking</button>
+  </div>
+
+  <script>
+    // Elements
+    const videoEl = document.getElementById('inputVideo');
+    const canvasEl = document.getElementById('outputCanvas');
+    const ctx = canvasEl.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const startWrap = document.getElementById('startWrap');
+    const handInfo = document.getElementById('handInfo');
+    const dot = document.getElementById('dot');
+    const fpsEl = document.getElementById('fps');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const legend = document.getElementById('legend');
+
+    // Settings
+    let settings = {
+      detectionConfidence: 0.7,
+      trackingConfidence: 0.5,
+      maxHands: 2,
+      landmarkSize: 4,
+      showConnections: true,
+      showLegend: false
+    };
+
+    // MediaPipe hand landmark indices
+    const HAND_LANDMARKS = {
+      WRIST: 0,
+      THUMB: [1, 2, 3, 4],
+      INDEX: [5, 6, 7, 8],
+      MIDDLE: [9, 10, 11, 12],
+      RING: [13, 14, 15, 16],
+      PINKY: [17, 18, 19, 20]
+    };
+
+    const FINGER_COLORS = {
+      WRIST: '#ff0080',
+      THUMB: '#ff6b6b',
+      INDEX: '#4ecdc4',
+      MIDDLE: '#45b7d1',
+      RING: '#96ceb4',
+      PINKY: '#ffeaa7'
+    };
+
+    // Enhanced hand connections for better visualization
+    const ENHANCED_CONNECTIONS = [
+      // Palm connections
+      [0, 1], [0, 5], [0, 9], [0, 13], [0, 17],
+      // Thumb
+      [1, 2], [2, 3], [3, 4],
+      // Index
+      [5, 6], [6, 7], [7, 8],
+      // Middle
+      [9, 10], [10, 11], [11, 12],
+      // Ring
+      [13, 14], [14, 15], [15, 16],
+      // Pinky
+      [17, 18], [18, 19], [19, 20],
+      // Cross palm connections
+      [5, 9], [9, 13], [13, 17]
+    ];
+
+    // Performance monitoring
+    let performanceStats = {
+      frameCount: 0,
+      lastTime: performance.now(),
+      fps: 0,
+      avgProcessingTime: 0
+    };
+
+    // Device performance detection
+    function getDevicePerformance() {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl');
+      const renderer = gl.getParameter(gl.RENDERER);
+      
+      // Simple heuristic based on common mobile GPUs
+      if (renderer.includes('Adreno 6') || renderer.includes('Mali-G7') || renderer.includes('Apple A1')) {
+        return 'high';
+      } else if (renderer.includes('Adreno 5') || renderer.includes('Mali-G5')) {
+        return 'medium';
+      }
+      return 'low';
+    }
+
+    // DPI-aware canvas sizing with performance consideration
+    function fitCanvasToViewport() {
+      const devicePerf = getDevicePerformance();
+      let dpr = window.devicePixelRatio || 1;
+      
+      // Limit DPR based on device performance
+      if (devicePerf === 'low') dpr = Math.min(dpr, 1.5);
+      else if (devicePerf === 'medium') dpr = Math.min(dpr, 2);
+      else dpr = Math.min(dpr, 2.5);
+      
+      const w = Math.round(window.innerWidth * dpr);
+      const h = Math.round(window.innerHeight * dpr);
+      
+      canvasEl.width = w;
+      canvasEl.height = h;
+      canvasEl.style.width = '100vw';
+      canvasEl.style.height = '100vh';
+      
+      // Scale context for crisp rendering
+      ctx.scale(dpr, dpr);
+    }
+
+    // Event listeners for responsive design
+    addEventListener('resize', fitCanvasToViewport);
+    addEventListener('orientationchange', () => setTimeout(fitCanvasToViewport, 150));
+
+    // Settings event handlers
+    settingsBtn.addEventListener('click', () => {
+      settingsPanel.classList.toggle('show');
+    });
+
+    document.getElementById('detectionConf').addEventListener('input', (e) => {
+      settings.detectionConfidence = parseFloat(e.target.value);
+      updateMediaPipeSettings();
+    });
+
+    document.getElementById('trackingConf').addEventListener('input', (e) => {
+      settings.trackingConfidence = parseFloat(e.target.value);
+      updateMediaPipeSettings();
+    });
+
+    document.getElementById('maxHands').addEventListener('input', (e) => {
+      settings.maxHands = parseInt(e.target.value);
+      updateMediaPipeSettings();
+    });
+
+    document.getElementById('landmarkSize').addEventListener('input', (e) => {
+      settings.landmarkSize = parseInt(e.target.value);
+    });
+
+    document.getElementById('showConnections').addEventListener('change', (e) => {
+      settings.showConnections = e.target.checked;
+    });
+
+    document.getElementById('showLegend').addEventListener('change', (e) => {
+      settings.showLegend = e.target.checked;
+      legend.classList.toggle('show', e.target.checked);
+    });
+
+    // Advanced gesture detection
+    function getFingerStatus(landmarks) {
+      const tips = [4, 8, 12, 16, 20];
+      const pips = [3, 6, 10, 14, 18];
+      const mcps = [2, 5, 9, 13, 17];
+      const up = [];
+      
+      for (let i = 0; i < 5; i++) {
+        const tip = landmarks[tips[i]];
+        const pip = landmarks[pips[i]];
+        const mcp = landmarks[mcps[i]];
+        
+        if (i === 0) { // Thumb special case
+          up.push(tip.x > pip.x ? 1 : 0);
+        } else {
+          // Consider finger extended if tip is above both pip and mcp
+          up.push((tip.y < pip.y && tip.y < mcp.y) ? 1 : 0);
+        }
+      }
+      return up;
+    }
+
+    function detectAdvancedGesture(landmarks) {
+      const up = getFingerStatus(landmarks);
+      const extendedCount = up.reduce((a, b) => a + b, 0);
+      
+      // More sophisticated gesture detection
+      if (extendedCount === 0) return "✊ Fist";
+      if (extendedCount === 5) return "🖐️ Open Hand";
+      if (up[1] && extendedCount === 1) return "👆 Pointing";
+      if (up[1] && up[2] && extendedCount === 2) return "✌️ Peace";
+      if (up[0] && extendedCount === 1) return "👍 Thumbs Up";
+      if (up[0] && up[1] && up[4] && extendedCount === 3) return "🤟 Rock On";
+      if (up[1] && up[4] && extendedCount === 2) return "🤘 Devil Horns";
+      
+      return `🔢 ${extendedCount} Fingers`;
+    }
+
+    function calculateHandMetrics(landmarks) {
+      // Calculate hand size for normalization
+      const wrist = landmarks[0];
+      const middleTip = landmarks[12];
+      const handLength = Math.sqrt(
+        Math.pow(middleTip.x - wrist.x, 2) + 
+        Math.pow(middleTip.y - wrist.y, 2)
+      );
+      
+      // Calculate hand orientation
+      const indexMcp = landmarks[5];
+      const pinkyMcp = landmarks[17];
+      const handAngle = Math.atan2(
+        pinkyMcp.y - indexMcp.y,
+        pinkyMcp.x - indexMcp.x
+      ) * 180 / Math.PI;
+      
+      return { handLength, handAngle };
+    }
+
+    // Enhanced drawing functions
+    function drawEnhancedHand(landmarks, handedness, canvasWidth, canvasHeight) {
+      const isLeft = handedness === 'Left';
+      const metrics = calculateHandMetrics(landmarks);
+      
+      // Draw connections first (behind landmarks)
+      if (settings.showConnections) {
+        drawConnections(landmarks, canvasWidth, canvasHeight, isLeft);
+      }
+      
+      // Draw landmarks with finger-specific colors
+      drawColoredLandmarks(landmarks, canvasWidth, canvasHeight);
+      
+      return {
+        gesture: detectAdvancedGesture(landmarks),
+        metrics: metrics
+      };
+    }
+
+    function drawConnections(landmarks, w, h, isLeft) {
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      
+      ENHANCED_CONNECTIONS.forEach(([start, end]) => {
+        const startPoint = landmarks[start];
+        const endPoint = landmarks[end];
+        
+        // Color connections based on finger
+        let color = '#ffffff40';
+        if (start === 0 || end === 0) color = FINGER_COLORS.WRIST + '60';
+        else if (HAND_LANDMARKS.THUMB.includes(start) || HAND_LANDMARKS.THUMB.includes(end)) color = FINGER_COLORS.THUMB + '60';
+        else if (HAND_LANDMARKS.INDEX.includes(start) || HAND_LANDMARKS.INDEX.includes(end)) color = FINGER_COLORS.INDEX + '60';
+        else if (HAND_LANDMARKS.MIDDLE.includes(start) || HAND_LANDMARKS.MIDDLE.includes(end)) color = FINGER_COLORS.MIDDLE + '60';
+        else if (HAND_LANDMARKS.RING.includes(start) || HAND_LANDMARKS.RING.includes(end)) color = FINGER_COLORS.RING + '60';
+        else if (HAND_LANDMARKS.PINKY.includes(start) || HAND_LANDMARKS.PINKY.includes(end)) color = FINGER_COLORS.PINKY + '60';
+        
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x * w, startPoint.y * h);
+        ctx.lineTo(endPoint.x * w, endPoint.y * h);
+        ctx.stroke();
+      });
+    }
+
+    function drawColoredLandmarks(landmarks, w, h) {
+      landmarks.forEach((landmark, index) => {
+        let color = '#ffffff';
+        let size = settings.landmarkSize;
+        
+        // Determine color based on landmark position
+        if (index === HAND_LANDMARKS.WRIST) {
+          color = FINGER_COLORS.WRIST;
+          size = settings.landmarkSize + 2;
+        } else if (HAND_LANDMARKS.THUMB.includes(index)) {
+          color = FINGER_COLORS.THUMB;
+          if (index === 4) size = settings.landmarkSize + 1; // Thumb tip
+        } else if (HAND_LANDMARKS.INDEX.includes(index)) {
+          color = FINGER_COLORS.INDEX;
+          if (index === 8) size = settings.landmarkSize + 1; // Index tip
+        } else if (HAND_LANDMARKS.MIDDLE.includes(index)) {
+          color = FINGER_COLORS.MIDDLE;
+          if (index === 12) size = settings.landmarkSize + 1; // Middle tip
+        } else if (HAND_LANDMARKS.RING.includes(index)) {
+          color = FINGER_COLORS.RING;
+          if (index === 16) size = settings.landmarkSize + 1; // Ring tip
+        } else if (HAND_LANDMARKS.PINKY.includes(index)) {
+          color = FINGER_COLORS.PINKY;
+          if (index === 20) size = settings.landmarkSize + 1; // Pinky tip
+        }
+        
+        // Draw landmark with glow effect
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(landmark.x * w, landmark.y * h, size, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Add white center for better visibility
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(landmark.x * w, landmark.y * h, size * 0.4, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    }
+
+    // Performance monitoring
+    function updatePerformanceStats() {
+      const now = performance.now();
+      performanceStats.frameCount++;
+      
+      if (now - performanceStats.lastTime >= 1000) {
+        performanceStats.fps = performanceStats.frameCount;
+        performanceStats.frameCount = 0;
+        performanceStats.lastTime = now;
+        
+        fpsEl.textContent = `FPS: ${performanceStats.fps}`;
+        
+        // Auto-adjust quality based on performance
+        if (performanceStats.fps < 15 && settings.landmarkSize > 2) {
+          settings.landmarkSize = Math.max(2, settings.landmarkSize - 1);
+          document.getElementById('landmarkSize').value = settings.landmarkSize;
+        }
+      }
+    }
+
+    // MediaPipe Hands setup
+    const hands = new Hands({ 
+      locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` 
+    });
+    
+    function updateMediaPipeSettings() {
+      hands.setOptions({
+        maxNumHands: settings.maxHands,
+        modelComplexity: 1,
+        minDetectionConfidence: settings.detectionConfidence,
+        minTrackingConfidence: settings.trackingConfidence
+      });
+    }
+    
+    updateMediaPipeSettings();
+    hands.onResults(onResults);
+
+    // Main results handler
+    function onResults(results) {
+      updatePerformanceStats();
+      
+      ctx.save();
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        let handsData = [];
+        
+        results.multiHandLandmarks.forEach((landmarks, i) => {
+          const handedness = results.multiHandedness?.[i]?.label || "Unknown";
+          const confidence = results.multiHandedness?.[i]?.score || 0;
+          
+          const handData = drawEnhancedHand(landmarks, handedness, w, h);
+          
+          handsData.push({
+            hand: handedness,
+            confidence: Math.round(confidence * 100),
+            gesture: handData.gesture,
+            metrics: handData.metrics
+          });
+        });
+        
+        // Update UI
+        updateHandInfo(handsData);
+        dot.classList.add('live');
+      } else {
+        // No hands detected
+        updateHandInfo([]);
+        dot.classList.remove('live');
+      }
+      
+      ctx.restore();
+    }
+
+    function updateHandInfo(handsData) {
+      const handsGrid = handInfo.querySelector('.hands-grid');
+      
+      if (handsData.length === 0) {
+        handsGrid.innerHTML = '<div class="hand-info">👀 Looking for hands...</div>';
+        return;
+      }
+      
+      const handsHTML = handsData.map((hand, i) => {
+        const color = hand.hand === 'Left' ? '#ff6b6b' : '#4ecdc4';
+        const angle = Math.round(hand.metrics.handAngle);
+        
+        return `
+          <div class="hand-info" style="border-color: ${color};">
+            <div style="color: ${color}; font-weight: bold;">${hand.hand}</div>
+            <div>
+              <div style="font-weight: bold;">${hand.gesture}</div>
+              <div style="font-size: 11px; opacity: 0.8;">
+                Confidence: ${hand.confidence}% • Angle: ${angle}°
+              </div>
+            </div>
+            <div style="width: 8px; height: 8px; background: ${color}; border-radius: 50%;"></div>
+          </div>
+        `;
+      }).join('');
+      
+      handsGrid.innerHTML = handsHTML;
+    }
+
+    // Camera initialization with dynamic resolution
+    async function initializeCamera() {
+      try {
+        fitCanvasToViewport();
+        
+        // Get optimal camera resolution based on screen
+        const screenRatio = window.innerWidth / window.innerHeight;
+        let cameraWidth = 1280;
+        let cameraHeight = 720;
+        
+        if (screenRatio > 1.5) {
+          // Wide screen
+          cameraWidth = 1920;
+          cameraHeight = 1080;
+        } else if (screenRatio < 0.75) {
+          // Tall screen (portrait mobile)
+          cameraWidth = 720;
+          cameraHeight = 1280;
+        }
+        
+        const camera = new Camera(videoEl, {
+          onFrame: async () => {
+            await hands.send({ image: videoEl });
+          },
+          width: cameraWidth,
+          height: cameraHeight
+        });
+        
+        await camera.start();
+        
+        // Ensure proper fullscreen video
+        videoEl.setAttribute('playsinline', '');
+        videoEl.style.width = '100vw';
+        videoEl.style.height = '100vh';
+        
+        startWrap.classList.add('hidden');
+        
+      } catch (error) {
+        console.error('Camera initialization failed:', error);
+        startBtn.textContent = getErrorMessage(error);
+        startBtn.disabled = true;
+      }
+    }
+
+    function getErrorMessage(error) {
+      if (error.name === 'NotAllowedError') {
+        return '❌ Camera permission denied';
+      } else if (error.name === 'NotFoundError') {
+        return '❌ No camera found';
+      } else if (error.name === 'NotSupportedError') {
+        return '❌ Camera not supported';
+      } else {
+        return '❌ Camera error';
+      }
+    }
+
+    // Start button handler
+    startBtn.addEventListener('click', initializeCamera, { passive: true });
+
+    // Initialize settings UI
+    document.getElementById('detectionConf').value = settings.detectionConfidence;
+    document.getElementById('trackingConf').value = settings.trackingConfidence;
+    document.getElementById('maxHands').value = settings.maxHands;
+    document.getElementById('landmarkSize').value = settings.landmarkSize;
+    document.getElementById('showConnections').checked = settings.showConnections;
+    document.getElementById('showLegend').checked = settings.showLegend;
+  </script>
+</body>
+</html>
