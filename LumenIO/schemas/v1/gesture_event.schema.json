@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gesture_event",
+  "type": "object",
+  "required": ["t","type","state","params","target"],
+  "properties": {
+    "t": { "type": "number" },
+    "type": { "const": "gesture_event" },
+    "state": { "enum": ["idle","pinch:start","pinch:hold","pinch:cancel","drag:start","drag:move","drag:end","rotate:start","rotate:move","rotate:end","scale:start","scale:move","scale:end"] },
+    "params": { "type": "object", "properties": {
+      "x": {"type":"number"}, "y": {"type":"number"}, "angle": {"type":"number"}, "scale": {"type":"number"}
+    }, "additionalProperties": false },
+    "target": { "type":"string", "description":"scene node id" }
+  },
+  "additionalProperties": false
+}
