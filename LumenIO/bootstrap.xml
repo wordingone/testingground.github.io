@@ -5,7 +5,7 @@
     <author role="cipher">LLM/NN Prompt Engineer</author>
     <author role="forge">Mech/Electrical/Industrial Engineer</author>
   </authors>
-  <repository>https://github.com/testingground/LumenIO</repository>
+  <repository>https://github.com/testingground/testingground.github.io</repository>
   <modules>
     <module>hub</module>
     <module>clients</module>
