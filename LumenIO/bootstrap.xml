@@ -24,6 +24,23 @@
     <dep>WebRTC/WebGPU/WebXR</dep>
   </dependencies>
 
+  <packages>
+    <package name="core"/>
+    <package name="pc" depends="core"/>
+    <package name="mobile" depends="core"/>
+    <package name="pcproj" depends="core"/>
+    <package name="mobileproj" depends="core"/>
+    <package name="standalone" depends="core"/>
+    <package name="wearables" depends="core"/>
+
+    <package name="e2e-pc" depends="pc"/>
+    <package name="e2e-mobile" depends="mobile"/>
+    <package name="e2e-pcproj" depends="pcproj"/>
+    <package name="e2e-mobileproj" depends="mobileproj"/>
+    <package name="e2e-standalone" depends="standalone"/>
+    <package name="e2e-wearables" depends="wearables"/>
+  </packages>
+
   <handoff>
     <directory>LumenIO</directory>
     <file>bootstrap.xml</file>
