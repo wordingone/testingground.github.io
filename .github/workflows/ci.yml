@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd LumenIO/core && npm test
+
+  variants:
+    needs: core
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [ pc, mobile, pcproj, mobileproj, standalone, wearables ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd LumenIO/variants/${{ matrix.variant }} && npm test
+
+  e2e:
+    needs: variants
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [ e2e-pc, e2e-mobile, e2e-pcproj, e2e-mobileproj, e2e-standalone, e2e-wearables ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          cd LumenIO/e2e/${{ matrix.package }}
+          npm install
+          npx playwright install
+          npm test
