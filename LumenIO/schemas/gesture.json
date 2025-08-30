@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Gesture",
+  "type": "object",
+  "properties": {
+    "type": {"type": "string"},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+  },
+  "required": ["type", "confidence"],
+  "additionalProperties": false
+}

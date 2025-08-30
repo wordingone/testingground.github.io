@@ -1,0 +1,32 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Install Node deps
+        working-directory: LumenIO/clients/web
+        run: npm ci
+      - name: Run vitest
+        working-directory: LumenIO/clients/web
+        run: npm test
+      - name: Run playwright
+        working-directory: LumenIO/clients/web
+        run: npx playwright install --with-deps && npx playwright test
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Python deps
+        working-directory: LumenIO/hub
+        run: pip install -r requirements.txt
+      - name: Run pytest
+        working-directory: LumenIO/hub
+        run: pytest
