@@ -1,0 +1,79 @@
+name: LumenIO Matrix CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  core:
+    name: Core Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: |
+          cd LumenIO/packages/lumenio-core
+          pip install -e .
+          pytest tests/
+
+  variants:
+    name: Variant Tests
+    runs-on: ${{ matrix.os }}
+    needs: core
+    strategy:
+      matrix:
+        variant: [pc, mobile, pcproj, mobileproj, standalone, wearables]
+        os: [ubuntu-latest]
+        include:
+          - variant: pc
+            sensors: webcam,keyboard,mouse
+            e2e: desktop
+          - variant: mobile
+            sensors: camera,gyro,touch,accelerometer
+            e2e: mobile
+          - variant: pcproj
+            sensors: webcam,keyboard,mouse,projector
+            e2e: desktop-projector
+          - variant: mobileproj
+            sensors: camera,gyro,touch,accelerometer,projector
+            e2e: mobile-projector
+          - variant: standalone
+            sensors: camera,lidar,projector,compute
+            e2e: embedded
+          - variant: wearables
+            sensors: imu,camera,haptic,display
+            e2e: wearable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Core
+        run: |
+          cd LumenIO/packages/lumenio-core
+          pip install -e .
+      - name: Test Variant ${{ matrix.variant }}
+        run: |
+          cd LumenIO/packages/lumenio-${{ matrix.variant }}
+          pip install -e .
+          pytest tests/unit/
+      - name: E2E Tests ${{ matrix.variant }}
+        run: |
+          cd LumenIO/packages/lumenio-${{ matrix.variant }}
+          npm install
+          npx playwright install
+          npx playwright test --project=${{ matrix.e2e }}
+
+  integration:
+    name: Cross-Variant Integration
+    runs-on: ubuntu-latest
+    needs: variants
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python LumenIO/scripts/validate_contracts.py
+          python LumenIO/scripts/version_compatibility_check.py

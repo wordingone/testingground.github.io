@@ -1,0 +1,59 @@
+{
+  "variant_template": {
+    "structure": {
+      "package.json": "variant package manifest",
+      "src/": {
+        "adapters/": "device-specific adapter implementations",
+        "config/": "variant-specific configuration",
+        "main.py": "entry point importing Core + adapters"
+      },
+      "tests/": {
+        "unit/": "variant-specific unit tests",
+        "e2e/": "device-specific E2E tests (Playwright)"
+      },
+      "pyproject.toml": "Python dependencies + Core version pin"
+    },
+    "example_package_json": {
+      "name": "@lumenio/pc",
+      "version": "0.1.0",
+      "description": "LumenIO PC Desktop Variant",
+      "main": "src/main.py",
+      "dependencies": {
+        "@lumenio/core": "^0.1.0"
+      },
+      "devDependencies": {
+        "vitest": "^2.0.0",
+        "playwright": "^1.40.0"
+      },
+      "scripts": {
+        "dev": "python src/main.py --dev",
+        "build": "python -m build",
+        "test": "vitest",
+        "test:e2e": "playwright test"
+      },
+      "lumenio": {
+        "variant": "pc",
+        "target": "desktop",
+        "sensors": ["webcam", "keyboard", "mouse"],
+        "features": {
+          "projector": false,
+          "mobile_sensors": false,
+          "embedded_compute": false
+        }
+      }
+    },
+    "adapter_template": {
+      "class_name": "PCDeviceAdapter",
+      "imports": ["from lumenio_core.contracts import IDeviceAdapter"],
+      "methods": ["initialize", "get_sensor_data", "send_output", "get_capabilities"]
+    }
+  },
+  "variant_configs": {
+    "pc": {"sensors": ["webcam", "keyboard", "mouse"], "projector": false},
+    "mobile": {"sensors": ["camera", "gyro", "touch", "accelerometer"], "projector": false},
+    "pcproj": {"sensors": ["webcam", "keyboard", "mouse", "projector"], "projector": true},
+    "mobileproj": {"sensors": ["camera", "gyro", "touch", "accelerometer", "projector"], "projector": true},
+    "standalone": {"sensors": ["camera", "lidar", "projector", "compute"], "embedded": true},
+    "wearables": {"sensors": ["imu", "camera", "haptic", "display"], "wearable": true}
+  }
+}

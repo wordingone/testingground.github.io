@@ -1,18 +1,60 @@
 <project>
-  <name>LumenIO</name>
-  <description>Gesture-first multi-device programming interface (PC, Mobile, Projector, Standalone, Wearables).</description>
-  <authors>
-    <author role="cipher">LLM/NN Prompt Engineer</author>
-    <author role="forge">Mech/Electrical/Industrial Engineer</author>
-  </authors>
-  <repository>https://github.com/testingground/testingground.github.io</repository>
-  <modules>
-    <module>hub</module>
-    <module>clients</module>
-    <module>adapters</module>
-    <module>agents</module>
-    <module>calibration</module>
-  </modules>
+  <brand>
+    <name>LumenIO</name>
+    <description>Gesture-first multi-device programming interface ecosystem</description>
+    <repository>https://github.com/testingground/testingground.github.io</repository>
+  </brand>
+  <core>
+    <name>LumenIO-Core</name>
+    <description>Shared contracts, schemas, gesture FSM, calibration, agents</description>
+    <version>0.1.0</version>
+    <modules>
+      <module>contracts</module>
+      <module>schemas</module>
+      <module>gestures</module>
+      <module>calibration</module>
+      <module>agents</module>
+      <module>common</module>
+    </modules>
+  </core>
+  <variants>
+    <variant>
+      <name>LumenIO-PC</name>
+      <target>desktop</target>
+      <sensors>webcam,keyboard,mouse</sensors>
+      <core_version>^0.1.0</core_version>
+    </variant>
+    <variant>
+      <name>LumenIO-Mobile</name>
+      <target>mobile</target>
+      <sensors>camera,gyro,touch,accelerometer</sensors>
+      <core_version>^0.1.0</core_version>
+    </variant>
+    <variant>
+      <name>LumenIO-PCProj</name>
+      <target>desktop+projector</target>
+      <sensors>webcam,projector,keyboard,mouse</sensors>
+      <core_version>^0.1.0</core_version>
+    </variant>
+    <variant>
+      <name>LumenIO-MobileProj</name>
+      <target>mobile+projector</target>
+      <sensors>camera,projector,gyro,touch,accelerometer</sensors>
+      <core_version>^0.1.0</core_version>
+    </variant>
+    <variant>
+      <name>LumenIO-Standalone</name>
+      <target>embedded</target>
+      <sensors>camera,lidar,projector,compute</sensors>
+      <core_version>^0.1.0</core_version>
+    </variant>
+    <variant>
+      <name>LumenIO-Wearables</name>
+      <target>wearable</target>
+      <sensors>imu,camera,haptic,display</sensors>
+      <core_version>^0.1.0</core_version>
+    </variant>
+  </variants>
   <dependencies>
     <dep>Python 3.11+</dep>
     <dep>FastAPI + aiortc</dep>
@@ -23,18 +65,16 @@
     <dep>Node 20</dep>
     <dep>Vite/Vitest/Playwright</dep>
   </dependencies>
-  <testing>
-    <python>pytest httpx jsonschema coverage</python>
-    <node>vitest playwright coverage</node>
-  </testing>
-  <ci>
-    <service>GitHub Actions</service>
-  </ci>
+  <authors>
+    <author role="cipher">LLM/NN Prompt Engineer</author>
+    <author role="forge">Mech/Electrical/Industrial Engineer</author>
+  </authors>
+  <preferences>
+    <codex_mode>CODE_FIRST_MINIMAL</codex_mode>
+    <versioning>semver_core_pinned_variants</versioning>
+  </preferences>
   <handoff>
     <directory>LumenIO</directory>
     <file>bootstrap.xml</file>
   </handoff>
-  <preferences>
-    <codex_mode>CODE_FIRST_MINIMAL</codex_mode>
-  </preferences>
 </project>
