@@ -1,0 +1,35 @@
+<project>
+  <name>LumenIO</name>
+  <description>Gesture-first multi-device programming interface (PC, Mobile, Projector, Standalone, Wearables).</description>
+  <authors>
+    <author role="cipher">LLM/NN Prompt Engineer</author>
+    <author role="forge">Mech/Electrical/Industrial Engineer</author>
+  </authors>
+  <repository>https://github.com/testingground/LumenIO</repository>
+
+  <modules>
+    <module>hub</module>
+    <module>clients</module>
+    <module>adapters</module>
+    <module>agents</module>
+    <module>calibration</module>
+  </modules>
+
+  <dependencies>
+    <dep>Python 3.11+</dep>
+    <dep>FastAPI + aiortc</dep>
+    <dep>OpenCV</dep>
+    <dep>MediaPipe/TFLite</dep>
+    <dep>Blender Python API</dep>
+    <dep>WebRTC/WebGPU/WebXR</dep>
+  </dependencies>
+
+  <handoff>
+    <directory>LumenIO</directory>
+    <file>bootstrap.xml</file>
+  </handoff>
+
+  <preferences>
+    <codex_mode>CODE_FIRST_MINIMAL</codex_mode>
+  </preferences>
+</project>
