@@ -1,0 +1,10 @@
+{
+  "name": "@lumenio/e2e-pc",
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "^1.41.1"
+  },
+  "scripts": {
+    "test": "playwright test"
+  }
+}

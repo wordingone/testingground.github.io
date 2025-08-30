@@ -13,7 +13,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+ codex/implement-separated-e2e-architecture-ky1cil
+      - run: cd LumenIO/core && npm test
       - run: cd core && npm test
+main
 
   variants:
     needs: core
@@ -26,7 +29,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+codex/implement-separated-e2e-architecture-ky1cil
+      - run: cd LumenIO/variants/${{ matrix.variant }} && npm test
       - run: cd variants/${{ matrix.variant }} && npm test
+main
 
   e2e:
     needs: variants
@@ -39,4 +45,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: cd e2e/${{ matrix.package }} && npm test
+codex/implement-separated-e2e-architecture-ky1cil
+      - run: |
+          cd LumenIO/e2e/${{ matrix.package }}
+          npm install
+          npx playwright install
+          npm test
+      - run: cd e2e/${{ matrix.package
+      main
